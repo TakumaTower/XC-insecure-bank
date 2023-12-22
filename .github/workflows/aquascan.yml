@@ -5,6 +5,8 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+env:
+  IMAGE_NAME: takumatower/xc_test:demo2
 
 jobs:
   aqua:
@@ -70,3 +72,22 @@ jobs:
 #   - uses: actions/checkout@v3
 #   - name: Build the Docker image
 #     run: docker build . --file Dockerfile --tag my-image-name:$(date +%s)
+
+  build:
+    name: Build, Scan, and Push Docker image
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Build the Docker image
+      run: docker build . --file Dockerfile --tag $IMAGE_NAME
+    - name: Aqua Image Scanner
+      run: |
+        docker image ls 
+        docker login registry.aquasec.com -u "${{ secrets.AQUA_USER }}" -p "${{ secrets.AQUA_PASSWORD }}"
+        docker pull registry.aquasec.com/scanner:2311.1.9
+        docker run -v /var/run/docker.sock:/var/run/docker.sock registry.aquasec.com/scanner:2311.1.9 scan -w /tmp --host "${{ secrets.AQUA_HOST }}" --token "${{ secrets.AQUA_TOKEN }}" --show-negligible --local takumatower/xc_test:demo2 --htmlfile /tmp/out.html --jsonfile /tmp/out.json > /dev/null
+
+    - name: Push Docker image to repository
+      run: |
+        docker login --username "${{ secrets.DOCKER_USERNAME }}" --password "${{ secrets.DOCKER_PASSWORD }}"
+        docker push $IMAGE_NAME
